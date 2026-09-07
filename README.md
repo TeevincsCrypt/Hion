@@ -15,8 +15,9 @@ and streamed live.
 
 ## Status
 
-Backend and agent brain, complete and tested end to end. No UI yet — that is the
-next layer, and the event stream is shaped for it.
+Backend and agent brain, complete and tested end to end. Mission Control — a
+cinematic 3D frontend where the crew appears as live, status-driven
+characters — lives in [`web/`](web/README.md).
 
 ```
 95 tests passing · ruff clean · mypy clean · Strands Agents SDK 1.54
@@ -24,6 +25,18 @@ next layer, and the event stream is shaped for it.
 
 `hion doctor` confirms whether a real model is currently reachable in your
 environment, and `hion verify` runs the full lifecycle against it.
+
+### Running Mission Control
+
+```bash
+hion serve                             # the real backend (needs a working model provider)
+cd web && npm install && npm run dev   # http://localhost:3000
+```
+
+No model credential in this environment? `python scripts/dev_backend.py` runs
+the real engine, event bus and API with only the model provider swapped for
+the same scripted double the backend's own tests use — see
+[`web/README.md`](web/README.md#local-development) for details.
 
 ---
 
