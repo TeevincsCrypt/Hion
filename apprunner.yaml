@@ -1,0 +1,33 @@
+# AWS App Runner config for the Hion backend, deployed straight from source
+# (no Docker/ECR step needed): AWS Console -> App Runner -> Create service ->
+# "Source code repository" -> pick this repo/branch. App Runner builds and
+# runs this automatically. Runs as a persistent process, so SSE streaming and
+# the in-memory mission store both work exactly as they do locally.
+#
+# HION_MODEL_PROVIDER is set to bedrock so the model runs on Amazon Bedrock
+# via App Runner's instance role - no API key to manage. Two things to set up
+# once in the AWS console:
+#   1. Bedrock console -> Model access -> enable the Claude model in
+#      HION_AWS_REGION below.
+#   2. App Runner service -> Configuration -> Security -> Instance role ->
+#      attach a policy granting bedrock:InvokeModel and
+#      bedrock:InvokeModelWithResponseStream (e.g. AmazonBedrockFullAccess,
+#      or a scoped-down custom policy for the hackathon).
+version: 1.0
+runtime: python311
+build:
+  commands:
+    build:
+      - pip3 install "."
+run:
+  runtime-version: 3.11.9
+  command: python3 -m uvicorn hion.asgi:app --host 0.0.0.0 --port 8000
+  network:
+    port: 8000
+  env:
+    - name: HION_MODEL_PROVIDER
+      value: bedrock
+    - name: HION_AWS_REGION
+      value: us-west-2
+    - name: HION_WORKSPACE_DIR
+      value: /tmp/workspace
