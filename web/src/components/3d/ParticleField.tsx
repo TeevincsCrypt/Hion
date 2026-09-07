@@ -29,17 +29,17 @@ export function ParticleField({ count = 260 }: { count?: number }) {
     if (!points.current) return;
     points.current.rotation.y = state.clock.elapsedTime * 0.008;
     const material = points.current.material as THREE.PointsMaterial;
-    material.opacity = 0.32 + Math.sin(state.clock.elapsedTime * 0.4) * 0.08;
+    material.opacity = 0.16 + Math.sin(state.clock.elapsedTime * 0.4) * 0.05;
   });
 
   return (
     <points ref={points}>
       <bufferGeometry ref={geometry} />
       <pointsMaterial
-        size={0.02}
-        color="#8fa3c9"
+        size={0.018}
+        color="#A0A0A0"
         transparent
-        opacity={0.32}
+        opacity={0.16}
         sizeAttenuation
         depthWrite={false}
       />

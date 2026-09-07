@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --font-display: ui-sans-serif, system-ui, sans-serif;
+  --font-display: ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -13,45 +13,36 @@ body {
 }
 
 body {
-  background: #050609;
-  color: #e7e9ee;
+  background: #f7f7f5;
+  color: #111111;
   font-feature-settings:
     "ss01" 1,
     "cv01" 1;
 }
 
-/* Thin, unobtrusive scrollbars that match the command-center aesthetic. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #272c3a transparent;
+  scrollbar-color: #d2d2ce transparent;
 }
 *::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #272c3a;
+  background: #d2d2ce;
   border-radius: 999px;
 }
 
-.text-glow {
-  text-shadow: 0 0 24px currentColor;
-}
-
-.panel {
-  background: linear-gradient(180deg, rgba(18, 21, 29, 0.72), rgba(10, 12, 18, 0.72));
-  border: 1px solid rgba(255, 255, 255, 0.06);
+/* Editorial surface: a flat white plane with a hairline border and a soft,
+   very low-contrast elevation - no glassmorphism, no heavy card shadow. */
+.surface-panel {
+  background: #ffffff;
+  border: 1px solid #e5e5e3;
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.03);
 }
 
 .hairline {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.noise-overlay {
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
-  opacity: 0.035;
-  mix-blend-mode: overlay;
+  border-color: #e5e5e3;
 }
 
 @media (prefers-reduced-motion: reduce) {

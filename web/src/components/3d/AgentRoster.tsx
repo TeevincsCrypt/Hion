@@ -13,6 +13,7 @@ interface AgentRosterProps {
   edges?: ConnectionEdge[];
   focusedId?: CharacterId | null;
   dimAll?: boolean;
+  onSelect?: (id: CharacterId) => void;
 }
 
 /**
@@ -26,7 +27,7 @@ interface AgentRosterProps {
  * clipping off a wide desktop arc - only positions scale, not the characters
  * themselves, so nothing looks stretched.
  */
-export function AgentRoster({ statuses, activity, edges, focusedId, dimAll }: AgentRosterProps) {
+export function AgentRoster({ statuses, activity, edges, focusedId, dimAll, onSelect }: AgentRosterProps) {
   const dimmed = dimAll || !!focusedId;
   const layoutScale = useLayoutScale();
 
@@ -51,6 +52,7 @@ export function AgentRoster({ statuses, activity, edges, focusedId, dimAll }: Ag
           activity={activity?.[id]}
           focused={focusedId === id}
           dimmed={dimmed}
+          onSelect={onSelect}
         />
       ))}
     </group>

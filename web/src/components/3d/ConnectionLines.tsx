@@ -13,11 +13,16 @@ interface ConnectionLinesProps {
   roster?: Record<CharacterId, RosterEntry>;
 }
 
+const STRUCTURAL_COLOR = "#D2D2CE";
+const ACCENT = "#B8814A";
+const PULSE_COLOR = "#111111";
+
 /**
  * Visual connections between agents, derived entirely from the mission's own
  * task graph and current activity (see `deriveAgentState.computeConnections`).
- * Structural edges are the plan's dependencies; active edges are a brief,
- * moving pulse showing which task is in flight right now.
+ * Structural edges are the plan's dependencies, drawn as quiet hairlines;
+ * active edges are the single accent color with a moving pulse, showing
+ * exactly which task is in flight right now.
  */
 export function ConnectionLines({ edges, roster = ROSTER }: ConnectionLinesProps) {
   const structural = edges.filter((e) => e.kind === "structural");
@@ -45,16 +50,13 @@ function curveFor(edge: ConnectionEdge, roster: Record<CharacterId, RosterEntry>
 
 function StructuralEdge({ edge, roster }: { edge: ConnectionEdge; roster: Record<CharacterId, RosterEntry> }) {
   const points = useMemo(() => curveFor(edge, roster).getPoints(24), [edge, roster]);
-  return <Line points={points} color="#3a4051" lineWidth={1} transparent opacity={0.35} />;
+  return <Line points={points} color={STRUCTURAL_COLOR} lineWidth={1} transparent opacity={0.8} />;
 }
-
-const PULSE_COLOR = "#e7e9ee";
 
 function ActiveEdge({ edge, roster }: { edge: ConnectionEdge; roster: Record<CharacterId, RosterEntry> }) {
   const curve = useMemo(() => curveFor(edge, roster), [edge, roster]);
   const points = useMemo(() => curve.getPoints(32), [curve]);
   const pulseRef = useRef<THREE.Mesh>(null);
-  const glowColor = roster[edge.to].hex;
 
   useFrame((state) => {
     const mesh = pulseRef.current;
@@ -66,7 +68,7 @@ function ActiveEdge({ edge, roster }: { edge: ConnectionEdge; roster: Record<Cha
 
   return (
     <group>
-      <Line points={points} color={glowColor} lineWidth={1.5} transparent opacity={0.55} />
+      <Line points={points} color={ACCENT} lineWidth={1.5} transparent opacity={0.85} />
       <mesh ref={pulseRef}>
         <sphereGeometry args={[0.045, 8, 8]} />
         <meshBasicMaterial color={PULSE_COLOR} />

@@ -6,31 +6,47 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        void: {
-          950: "#050609",
-          900: "#0a0c12",
-          800: "#12151d",
-          700: "#1b1f2a",
-          600: "#272c3a",
+        // Restrained monochrome foundation. Every screen is built from these
+        // five neutrals; color is reserved for the two semantic exceptions
+        // below (accent, risk) - never used decoratively.
+        paper: {
+          DEFAULT: "#F7F7F5",
+          dim: "#F0F0EE",
         },
-        signal: {
-          commander: "#f2e6c9",
-          research: "#5eead4",
-          analyst: "#a78bfa",
-          creator: "#34d399",
-          critic: "#fbbf24",
-          guardian: "#fb7185",
-          executor: "#93a0b8",
+        surface: "#FFFFFF",
+        ink: {
+          900: "#111111",
+          600: "#3F3F3D",
+          500: "#6B6B6B",
+          300: "#A0A0A0",
+          200: "#CFCFCB",
         },
-        ok: "#3fd68f",
-        warn: "#f5a524",
-        danger: "#f0555a",
+        line: {
+          DEFAULT: "#E5E5E3",
+          strong: "#D2D2CE",
+        },
+        // The one accent: what is currently active or requires attention.
+        // Never decorative, never a gradient partner.
+        accent: {
+          DEFAULT: "#B8814A",
+          soft: "#E4D2BC",
+          dim: "#8C6136",
+        },
+        // Risk escalation reuses ink/accent for LOW/MEDIUM and introduces the
+        // single semantic red for HIGH/failure - functional signaling, not
+        // decoration, and used nowhere else in the interface.
+        risk: {
+          high: "#B23B3B",
+          highSoft: "#EBD3D3",
+        },
+        ok: "#3F6B4F",
       },
       fontFamily: {
         display: [
           "var(--font-display)",
           "ui-sans-serif",
           "system-ui",
+          "-apple-system",
           "sans-serif",
         ],
         mono: [
@@ -42,7 +58,8 @@ const config: Config = {
         ],
       },
       letterSpacing: {
-        widest2: "0.35em",
+        wide2: "0.08em",
+        widest2: "0.22em",
       },
       keyframes: {
         "fade-in": {
@@ -50,25 +67,18 @@ const config: Config = {
           to: { opacity: "1" },
         },
         "fade-up": {
-          from: { opacity: "0", transform: "translateY(8px)" },
+          from: { opacity: "0", transform: "translateY(10px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
         "pulse-slow": {
-          "0%, 100%": { opacity: "0.55" },
+          "0%, 100%": { opacity: "0.4" },
           "50%": { opacity: "1" },
-        },
-        scan: {
-          "0%": { backgroundPosition: "0% 0%" },
-          "100%": { backgroundPosition: "0% 100%" },
         },
       },
       animation: {
-        "fade-in": "fade-in 0.6s ease-out both",
-        "fade-up": "fade-up 0.7s cubic-bezier(0.16,1,0.3,1) both",
-        "pulse-slow": "pulse-slow 3.2s ease-in-out infinite",
-      },
-      boxShadow: {
-        glow: "0 0 40px -8px var(--tw-shadow-color)",
+        "fade-in": "fade-in 0.7s cubic-bezier(0.16,1,0.3,1) both",
+        "fade-up": "fade-up 0.8s cubic-bezier(0.16,1,0.3,1) both",
+        "pulse-slow": "pulse-slow 2.6s ease-in-out infinite",
       },
     },
   },

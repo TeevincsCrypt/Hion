@@ -1,21 +1,34 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createMission, HionApiError } from "@/lib/api";
+import { createMission, getHealth, HionApiError } from "@/lib/api";
 import type { CharacterId, CharacterStatus } from "@/lib/agents";
 import { AgentRoster, IDLE_STATUSES } from "@/components/3d/AgentRoster";
 import { DynamicScene } from "@/components/3d/DynamicScene";
+import { StrandsMark } from "@/components/mission/StrandsMark";
+import { SystemStatus } from "@/components/mission/SystemStatus";
 
 const EXAMPLE_GOAL =
-  "Research the top competitors in the AI meeting assistant market and prepare a concise competitive brief.";
+  "Research the AI meeting assistant market and prepare a competitive brief.";
 
 export default function HomePage() {
   const router = useRouter();
   const [goal, setGoal] = useState("");
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [systemReady, setSystemReady] = useState<boolean | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getHealth()
+      .then(() => !cancelled && setSystemReady(true))
+      .catch(() => !cancelled && setSystemReady(false));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const statuses: Record<CharacterId, CharacterStatus> = launching
     ? { ...IDLE_STATUSES, commander: "WORKING" }
@@ -40,39 +53,45 @@ export default function HomePage() {
   }, [goal, launching, router]);
 
   return (
-    <main className="relative h-dvh w-full overflow-hidden">
+    <main className="relative h-dvh w-full overflow-hidden bg-paper">
       <div className="absolute inset-0">
         <DynamicScene>
           <AgentRoster statuses={statuses} />
         </DynamicScene>
       </div>
-      <div className="noise-overlay pointer-events-none absolute inset-0" />
-      <div
-        className="pointer-events-none absolute inset-0 transition-opacity duration-700"
-        style={{ opacity: launching ? 1 : 0 }}
-      >
-        <div className="absolute inset-0 bg-void-950/70" />
-      </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 flex flex-col items-center pt-10 sm:pt-14">
-        <h1 className="animate-fade-in text-2xl font-semibold tracking-widest2 text-white/95 sm:text-3xl">
-          HION
-        </h1>
-        <p className="animate-fade-in mt-3 text-[11px] font-medium tracking-widest2 text-white/40 sm:text-xs">
-          AUTONOMOUS WORK SYSTEM
-        </p>
+      <header className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-6 sm:p-10">
+        <div className="animate-fade-in">
+          <h1 className="text-[22px] font-semibold leading-none tracking-tight text-ink-900 sm:text-2xl">
+            Hion
+          </h1>
+          <p className="mt-2 text-[10px] font-medium uppercase tracking-widest2 text-ink-500">
+            Autonomous Work System
+          </p>
+        </div>
+        <div className="pointer-events-auto animate-fade-in">
+          <SystemStatus ready={systemReady} />
+        </div>
       </header>
 
+      <div className="pointer-events-none absolute bottom-6 left-6 z-10 hidden sm:block">
+        <StrandsMark />
+      </div>
+
       <div
-        className="absolute inset-x-0 bottom-0 flex flex-col items-center px-4 pb-8 transition-all duration-700 sm:pb-12"
+        className="absolute inset-x-0 bottom-0 flex flex-col items-center px-5 pb-6 transition-all duration-700 sm:pb-16"
         style={{
           opacity: launching ? 0 : 1,
-          transform: launching ? "translateY(12px)" : "translateY(0)",
+          transform: launching ? "translateY(14px)" : "translateY(0)",
         }}
       >
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-paper via-paper/85 to-transparent sm:h-56" />
+
         <div className="animate-fade-up w-full max-w-2xl">
-          <p className="mb-3 text-center text-sm text-white/50">What do you need Hion to accomplish?</p>
-          <div className="panel rounded-2xl p-3 shadow-glow shadow-white/[0.02]">
+          <p className="mb-2 text-center text-[13px] text-ink-500 sm:mb-4 sm:text-[15px]">
+            What do you need Hion to accomplish?
+          </p>
+          <div className="pointer-events-auto">
             <textarea
               ref={textareaRef}
               value={goal}
@@ -86,24 +105,21 @@ export default function HomePage() {
               placeholder={EXAMPLE_GOAL}
               rows={2}
               disabled={launching}
-              className="max-h-40 min-h-[4rem] w-full resize-none bg-transparent px-3 py-2 text-base text-white/90 placeholder:text-white/25 focus:outline-none disabled:opacity-60"
+              className="w-full resize-none border-0 border-b border-line bg-transparent px-1 pb-2 text-center font-display text-base leading-snug text-ink-900 placeholder:text-ink-300 focus:border-ink-900 focus:outline-none disabled:opacity-50 sm:pb-3 sm:text-2xl"
             />
-            <div className="flex items-center justify-between px-2 pb-1 pt-1">
-              <span className="text-[11px] text-white/25">
-                {goal.trim().length > 0 ? `${goal.trim().length} characters` : "Enter to launch"}
-              </span>
+            <div className="mt-3 flex items-center justify-center sm:mt-5">
               <button
                 type="button"
                 onClick={() => void submit()}
                 disabled={goal.trim().length < 8 || launching}
-                className="group inline-flex items-center gap-2 rounded-full bg-white/95 px-5 py-2 text-xs font-semibold uppercase tracking-widest2 text-void-950 transition hover:bg-white disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/40"
+                className="group inline-flex items-center gap-2.5 rounded-full bg-ink-900 px-7 py-2.5 text-xs font-semibold uppercase tracking-wide2 text-paper transition hover:bg-ink-600 disabled:cursor-not-allowed disabled:bg-ink-200 disabled:text-ink-500 sm:py-3"
               >
-                {launching ? "Launching" : "Start Mission"}
-                <span className="transition group-hover:translate-x-0.5">→</span>
+                {launching ? "Launching…" : "Start Mission"}
+                <span className="transition group-hover:translate-x-0.5">&rarr;</span>
               </button>
             </div>
           </div>
-          {error && <p className="mt-3 text-center text-xs text-danger">{error}</p>}
+          {error && <p className="mt-4 text-center text-xs text-risk-high">{error}</p>}
         </div>
       </div>
     </main>

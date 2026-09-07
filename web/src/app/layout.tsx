@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050609",
+  themeColor: "#F7F7F5",
   width: "device-width",
   initialScale: 1,
 };
@@ -17,11 +17,8 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className="dark">
-      <body className="antialiased">
-        <div className="fixed inset-0 -z-10 bg-void-950" />
-        {children}
-      </body>
+    <html lang="en">
+      <body className="bg-paper text-ink-900 antialiased">{children}</body>
     </html>
   );
 }

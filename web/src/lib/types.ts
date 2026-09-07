@@ -196,3 +196,18 @@ export const TERMINAL_MISSION_STATUSES: readonly MissionStatus[] = [
 export function isTerminalMissionStatus(status: MissionStatus): boolean {
   return TERMINAL_MISSION_STATUSES.includes(status);
 }
+
+/** GET /api/health - liveness plus the configuration the backend is actually running with. */
+export interface HealthResponse {
+  status: "ok" | "misconfigured";
+  model_provider: string;
+  model_id: string | null;
+  provider_configured: boolean;
+  detail: string;
+  max_revisions: number;
+  on_revisions_exhausted: string;
+  auto_approve_max_risk: RiskLevel;
+  critic_approval_threshold: number;
+  critic_min_dimension_score: number;
+  event_types: string[];
+}

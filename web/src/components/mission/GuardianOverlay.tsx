@@ -6,9 +6,9 @@ import type { ApprovalRequest, Mission } from "@/lib/types";
 import { ROSTER } from "@/lib/agents";
 
 const RISK_STYLES: Record<ApprovalRequest["risk_level"], string> = {
-  LOW: "text-signal-research border-signal-research/40",
-  MEDIUM: "text-warn border-warn/40",
-  HIGH: "text-danger border-danger/40",
+  LOW: "text-ink-500 border-line",
+  MEDIUM: "text-accent border-accent/40",
+  HIGH: "text-risk-high border-risk-high/40",
 };
 
 /**
@@ -29,7 +29,7 @@ export function GuardianOverlay({
   const [error, setError] = useState<string | null>(null);
 
   const task = mission.tasks.find((t) => t.id === approval.task_id);
-  const agentLabel = task ? ROSTER[task.assigned_agent].label : "Hion";
+  const agentLabel = task ? `${ROSTER[task.assigned_agent].label} Agent` : "Hion";
 
   const decide = async (approved: boolean) => {
     setError(null);
@@ -45,38 +45,36 @@ export function GuardianOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-void-950/55 backdrop-blur-[2px]">
-      <div className="animate-fade-up panel w-full max-w-lg rounded-2xl p-7 shadow-glow shadow-signal-guardian/10">
-        <p className="text-center text-[11px] font-semibold uppercase tracking-widest2 text-signal-guardian">
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-paper/70 backdrop-blur-sm">
+      <div className="animate-fade-up surface-panel w-full max-w-md rounded-lg p-8">
+        <p className="text-center text-[10px] font-semibold uppercase tracking-widest2 text-accent">
           Human Decision Required
         </p>
-        <h2 className="mt-3 text-center text-lg font-medium text-white/95">{approval.action}</h2>
-
-        <div className="mt-5 flex items-center justify-center gap-6 text-sm">
-          <Field label="Risk">
-            <span
-              className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${RISK_STYLES[approval.risk_level]}`}
-            >
-              {approval.risk_level}
-            </span>
-          </Field>
-          <Field label="Agent">
-            <span className="text-white/85">{agentLabel}</span>
-          </Field>
-        </div>
-
         {approval.rationale && (
-          <p className="mt-5 rounded-xl bg-white/[0.03] px-4 py-3 text-center text-[13px] leading-relaxed text-white/60">
-            {approval.rationale}
-          </p>
+          <p className="mt-4 text-center text-[15px] leading-relaxed text-ink-900">{approval.rationale}</p>
         )}
 
-        <div className="mt-7 flex gap-3">
+        <dl className="mt-7 space-y-4 border-t border-line pt-6">
+          <Row label="Action" value={approval.action} />
+          <Row
+            label="Risk"
+            value={
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${RISK_STYLES[approval.risk_level]}`}
+              >
+                {approval.risk_level}
+              </span>
+            }
+          />
+          <Row label="Requested by" value={agentLabel} />
+        </dl>
+
+        <div className="mt-8 flex gap-3">
           <button
             type="button"
             onClick={() => void decide(false)}
             disabled={deciding !== null}
-            className="flex-1 rounded-full border border-danger/40 py-2.5 text-xs font-semibold uppercase tracking-widest2 text-danger transition hover:bg-danger/10 disabled:opacity-50"
+            className="flex-1 rounded-full border border-ink-900/15 py-2.5 text-xs font-semibold uppercase tracking-wide2 text-ink-900 transition hover:border-risk-high/40 hover:text-risk-high disabled:opacity-50"
           >
             {deciding === "reject" ? "Rejecting…" : "Reject"}
           </button>
@@ -84,22 +82,22 @@ export function GuardianOverlay({
             type="button"
             onClick={() => void decide(true)}
             disabled={deciding !== null}
-            className="flex-1 rounded-full bg-ok/90 py-2.5 text-xs font-semibold uppercase tracking-widest2 text-void-950 transition hover:bg-ok disabled:opacity-50"
+            className="flex-1 rounded-full bg-ink-900 py-2.5 text-xs font-semibold uppercase tracking-wide2 text-paper transition hover:bg-ink-600 disabled:opacity-50"
           >
             {deciding === "approve" ? "Approving…" : "Approve"}
           </button>
         </div>
-        {error && <p className="mt-3 text-center text-xs text-danger">{error}</p>}
+        {error && <p className="mt-3 text-center text-xs text-risk-high">{error}</p>}
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="text-center">
-      <p className="text-[10px] font-medium uppercase tracking-widest2 text-white/30">{label}</p>
-      <div className="mt-1">{children}</div>
+    <div className="flex items-center justify-between gap-4">
+      <dt className="text-[10px] font-medium uppercase tracking-widest2 text-ink-300">{label}</dt>
+      <dd className="text-[13px] font-medium text-ink-900">{value}</dd>
     </div>
   );
 }

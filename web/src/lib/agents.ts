@@ -1,9 +1,14 @@
 /**
  * Static visual roster for the Hion crew.
  *
- * This is metadata only - names, roles, colors, base layout. It never carries
- * mission state; see `deriveAgentState.ts` for the pure functions that turn
- * real mission data into what each character should look like right now.
+ * This is metadata only - names, roles, layout. It never carries mission
+ * state; see `deriveAgentState.ts` for the pure functions that turn real
+ * mission data into what each character should look like right now.
+ *
+ * Deliberately no per-agent color: Hion's visual language is monochrome with
+ * a single accent reserved for "active/important" (see AgentCharacter.tsx's
+ * status→color mapping). Identity comes from geometric form and label, not
+ * from a rainbow of brand colors per role.
  */
 import type { AgentName } from "./types";
 
@@ -32,9 +37,6 @@ export interface RosterEntry {
   id: CharacterId;
   label: string;
   role: string;
-  /** Tailwind color token suffix, e.g. "research" -> signal-research. */
-  colorToken: CharacterId;
-  hex: string;
   /** Base position in the 3D scene, world units. Commander sits centered upstage. */
   position: readonly [number, number, number];
   baseScale: number;
@@ -53,8 +55,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "commander",
     label: "Commander",
     role: "Mission planning & synthesis",
-    colorToken: "commander",
-    hex: "#f2e6c9",
     position: [0, 0.95, -1.7],
     baseScale: 1.25,
     form: "core",
@@ -63,8 +63,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "executor",
     label: "Executor",
     role: "Tool execution layer",
-    colorToken: "executor",
-    hex: "#93a0b8",
     position: [-3.6, -0.35, 1.9],
     baseScale: 0.7,
     form: "spark",
@@ -73,8 +71,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "research",
     label: "Researcher",
     role: "Web research & evidence gathering",
-    colorToken: "research",
-    hex: "#5eead4",
     position: [-2.15, 0, 1.85],
     baseScale: 1,
     form: "shard",
@@ -83,8 +79,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "analyst",
     label: "Analyst",
     role: "Comparison, risk, recommendation",
-    colorToken: "analyst",
-    hex: "#a78bfa",
     position: [-0.72, 0, 1.8],
     baseScale: 1,
     form: "prism",
@@ -93,8 +87,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "creator",
     label: "Creator",
     role: "Drafting the deliverable",
-    colorToken: "creator",
-    hex: "#34d399",
     position: [0.72, 0, 1.8],
     baseScale: 1,
     form: "lattice",
@@ -103,8 +95,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "critic",
     label: "Critic",
     role: "Quality review & critique",
-    colorToken: "critic",
-    hex: "#fbbf24",
     position: [2.15, 0, 1.85],
     baseScale: 0.95,
     form: "flare",
@@ -113,8 +103,6 @@ export const ROSTER: Record<CharacterId, RosterEntry> = {
     id: "guardian",
     label: "Guardian",
     role: "Risk assessment & human approval",
-    colorToken: "guardian",
-    hex: "#fb7185",
     position: [3.6, 0, 1.9],
     baseScale: 0.95,
     form: "ring",

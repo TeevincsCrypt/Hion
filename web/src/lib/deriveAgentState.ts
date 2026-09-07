@@ -9,8 +9,8 @@
  * The 3D layer is a consumer of these functions; it is never the source of
  * truth for what an agent is doing.
  */
-import { CHARACTER_IDS, SPECIALIST_IDS, type CharacterId, type CharacterStatus } from "./agents";
-import type { AgentName, Mission, MissionEvent, Task, TaskStatus } from "./types";
+import { CHARACTER_IDS, ROSTER, SPECIALIST_IDS, type CharacterId, type CharacterStatus } from "./agents";
+import type { AgentName, Mission, MissionEvent, RiskLevel, Task, TaskStatus } from "./types";
 
 /**
  * Agents with an open agent.started...agent.completed/failed bracket, keyed by
@@ -228,44 +228,29 @@ export function computeProgress(
 }
 
 export interface ActivityLabel {
-  /** Short present-tense caption, e.g. "RESEARCHING". */
+  /** Short, sentence-case present-tense phrase, e.g. "Searching sources". */
   headline: string;
-  /** A real task title or the most recent event's own message. Never reasoning. */
-  detail: string | null;
 }
 
-const WORKING_VERB: Record<AgentName, string> = {
-  commander: "PLANNING",
-  research: "RESEARCHING",
-  analyst: "ANALYZING",
-  creator: "WRITING",
-  critic: "REVIEWING",
-  guardian: "ASSESSING RISK",
+/** Default phrase per agent while it is the active one - see the floating labels in Mission Control. */
+const WORKING_PHRASE: Record<AgentName, string> = {
+  commander: "Coordinating mission",
+  research: "Searching sources",
+  analyst: "Analyzing findings",
+  creator: "Preparing deliverable",
+  critic: "Reviewing output",
+  guardian: "Monitoring permissions",
 };
 
 function isTerminalTask(task: Task): boolean {
   return task.status === "COMPLETED" || task.status === "FAILED";
 }
 
-function lastEventForAgent(events: readonly MissionEvent[], agent: AgentName): MissionEvent | undefined {
-  for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i]?.agent === agent) return events[i];
-  }
-  return undefined;
-}
-
-function lastToolMessage(events: readonly MissionEvent[]): string | null {
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
-    if (event?.type === "tool.started" || event?.type === "tool.completed") return event.message;
-  }
-  return null;
-}
-
 /**
- * A short, real caption for every character currently doing something, built
- * only from the task it owns and the most recent event naming it - the same
- * two sources a person watching the raw event log would have.
+ * A short, real caption for every character currently doing something. The
+ * phrasing is fixed per (agent, phase) so the floating labels stay minimal,
+ * but which phrase is shown - and whether one shows at all - is entirely a
+ * function of real status.
  */
 export function computeActivityLabels(
   mission: Mission,
@@ -279,24 +264,232 @@ export function computeActivityLabels(
     if (status === "IDLE" || status === "COMPLETED" || status === "FAILED") continue;
 
     if (id === "executor") {
-      labels.executor = { headline: "EXECUTING", detail: lastToolMessage(events) };
+      labels.executor = { headline: "Executing tools" };
       continue;
     }
 
     const agent = id as AgentName;
-    let headline = WORKING_VERB[agent];
+    let headline = WORKING_PHRASE[agent];
     if (agent === "commander" && mission.tasks.length > 0 && mission.tasks.every(isTerminalTask)) {
-      headline = "SYNTHESIZING";
+      headline = "Preparing final result";
     }
     if (status === "WAITING") {
-      headline = agent === "guardian" ? "AWAITING APPROVAL" : "WAITING";
+      headline = agent === "guardian" ? "Awaiting human decision" : "Waiting";
     }
 
-    const task = mostRelevantTask(mission.tasks.filter((t) => t.assigned_agent === agent));
-    const lastEvent = lastEventForAgent(events, agent);
-    const detail = lastEvent?.message || task?.title || null;
-    labels[id] = { headline, detail };
+    labels[id] = { headline };
   }
 
   return labels;
+}
+
+// ---------------------------------------------------------------------------
+// Agent Inspector: the full, real detail behind one character, on demand.
+// ---------------------------------------------------------------------------
+
+export interface AgentInspectorData {
+  id: CharacterId;
+  label: string;
+  role: string;
+  status: CharacterStatus;
+  currentTask: string | null;
+  toolsUsed: string[];
+  completedTasks: number;
+  retries: number | null;
+  durationSeconds: number | null;
+  resultSummary: string | null;
+  riskLevel: RiskLevel | null;
+}
+
+function sumAgentDurationSeconds(events: readonly MissionEvent[], agent: AgentName): number | null {
+  const openAt = new Map<string, number>();
+  let total = 0;
+  let brackets = 0;
+  for (const event of events) {
+    if (event.agent !== agent) continue;
+    const key = event.task_id ?? NO_TASK;
+    const ms = new Date(event.created_at).getTime();
+    if (event.type === "agent.started") {
+      openAt.set(key, ms);
+    } else if (event.type === "agent.completed" || event.type === "agent.failed") {
+      const start = openAt.get(key);
+      if (start != null) {
+        total += (ms - start) / 1000;
+        brackets += 1;
+        openAt.delete(key);
+      }
+    }
+  }
+  return brackets > 0 ? total : null;
+}
+
+function toolsUsedBy(events: readonly MissionEvent[], agent: AgentName | null): string[] {
+  const names = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "tool.completed" || !event.tool_name) continue;
+    if (agent === null || event.agent === agent) names.add(event.tool_name);
+  }
+  return [...names].sort();
+}
+
+function mostRecentlyTouched(tasks: readonly Task[]): Task | undefined {
+  return tasks.reduce<Task | undefined>((latest, task) => {
+    if (!latest) return task;
+    return new Date(task.updated_at) > new Date(latest.updated_at) ? task : latest;
+  }, undefined);
+}
+
+function specialistInspector(
+  agent: AgentName,
+  status: CharacterStatus,
+  mission: Mission,
+  events: readonly MissionEvent[],
+): AgentInspectorData {
+  const tasks = mission.tasks.filter((t) => t.assigned_agent === agent);
+  const active = mostRelevantTask(tasks);
+  const reference = active ?? mostRecentlyTouched(tasks);
+  return {
+    id: agent,
+    label: ROSTER[agent].label,
+    role: ROSTER[agent].role,
+    status,
+    currentTask: status === "WORKING" ? (active?.title ?? null) : null,
+    toolsUsed: toolsUsedBy(events, agent),
+    completedTasks: tasks.filter((t) => t.status === "COMPLETED").length,
+    retries: tasks.reduce((sum, t) => sum + t.retry_count, 0),
+    durationSeconds: sumAgentDurationSeconds(events, agent),
+    resultSummary: reference?.result ?? null,
+    riskLevel: reference?.guardian_verdict?.risk_level ?? null,
+  };
+}
+
+function criticInspector(
+  status: CharacterStatus,
+  mission: Mission,
+  events: readonly MissionEvent[],
+): AgentInspectorData {
+  const reviewing = mission.tasks.find((t) => t.status === "REVIEWING");
+  const withCritique = mission.tasks.filter((t) => t.critique != null);
+  const reference = reviewing ?? mostRecentlyTouched(withCritique);
+  return {
+    id: "critic",
+    label: ROSTER.critic.label,
+    role: ROSTER.critic.role,
+    status,
+    currentTask: reviewing?.title ?? null,
+    toolsUsed: [],
+    completedTasks: withCritique.length,
+    retries: null,
+    durationSeconds: sumAgentDurationSeconds(events, "critic"),
+    resultSummary: reference?.critique?.reasoning ?? null,
+    riskLevel: null,
+  };
+}
+
+function guardianInspector(
+  status: CharacterStatus,
+  mission: Mission,
+  events: readonly MissionEvent[],
+): AgentInspectorData {
+  const waiting = mission.tasks.find((t) => t.status === "WAITING_FOR_APPROVAL");
+  const assessed = mission.tasks.filter((t) => t.guardian_verdict != null);
+  const reference = waiting ?? mostRecentlyTouched(assessed);
+  return {
+    id: "guardian",
+    label: ROSTER.guardian.label,
+    role: ROSTER.guardian.role,
+    status,
+    currentTask: waiting?.title ?? null,
+    toolsUsed: [],
+    completedTasks: assessed.length,
+    retries: null,
+    durationSeconds: sumAgentDurationSeconds(events, "guardian"),
+    resultSummary: reference?.guardian_verdict?.rationale ?? null,
+    riskLevel: reference?.guardian_verdict?.risk_level ?? null,
+  };
+}
+
+function commanderInspector(
+  status: CharacterStatus,
+  mission: Mission,
+  events: readonly MissionEvent[],
+): AgentInspectorData {
+  let currentTask: string | null = null;
+  if (status === "WORKING") {
+    currentTask = mission.tasks.length === 0 ? "Planning mission" : "Preparing final result";
+  }
+  return {
+    id: "commander",
+    label: ROSTER.commander.label,
+    role: ROSTER.commander.role,
+    status,
+    currentTask,
+    toolsUsed: [],
+    completedTasks: mission.tasks.filter((t) => t.status === "COMPLETED").length,
+    retries: mission.tasks.reduce((sum, t) => sum + t.retry_count, 0),
+    durationSeconds: sumAgentDurationSeconds(events, "commander"),
+    resultSummary: mission.final_result ?? mission.objective,
+    riskLevel: null,
+  };
+}
+
+function executorInspector(status: CharacterStatus, events: readonly MissionEvent[]): AgentInspectorData {
+  const open = new Map<string, string>();
+  let lastMessage: string | null = null;
+  const openedAt = new Map<string, number>();
+  let total = 0;
+  let brackets = 0;
+  for (const event of events) {
+    const id = typeof event.data.tool_use_id === "string" ? event.data.tool_use_id : null;
+    if (event.type === "tool.started" && id) {
+      if (event.tool_name) open.set(id, event.tool_name);
+      openedAt.set(id, new Date(event.created_at).getTime());
+    }
+    if (event.type === "tool.completed" && id) {
+      open.delete(id);
+      lastMessage = event.message;
+      const start = openedAt.get(id);
+      if (start != null) {
+        total += (new Date(event.created_at).getTime() - start) / 1000;
+        brackets += 1;
+        openedAt.delete(id);
+      }
+    }
+  }
+  const [inFlight] = open.values();
+  return {
+    id: "executor",
+    label: ROSTER.executor.label,
+    role: ROSTER.executor.role,
+    status,
+    currentTask: inFlight ?? null,
+    toolsUsed: toolsUsedBy(events, null),
+    completedTasks: events.filter((e) => e.type === "tool.completed").length,
+    retries: null,
+    durationSeconds: brackets > 0 ? total : null,
+    resultSummary: lastMessage,
+    riskLevel: null,
+  };
+}
+
+/** The full, real detail behind one character - what the Agent Inspector shows. */
+export function computeAgentInspector(
+  id: CharacterId,
+  mission: Mission,
+  events: readonly MissionEvent[],
+  statuses: Record<CharacterId, CharacterStatus>,
+): AgentInspectorData {
+  const status = statuses[id];
+  switch (id) {
+    case "commander":
+      return commanderInspector(status, mission, events);
+    case "critic":
+      return criticInspector(status, mission, events);
+    case "guardian":
+      return guardianInspector(status, mission, events);
+    case "executor":
+      return executorInspector(status, events);
+    default:
+      return specialistInspector(id, status, mission, events);
+  }
 }

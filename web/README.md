@@ -2,8 +2,15 @@
 
 A cinematic, 3D command-center frontend for Hion. You give it a goal; a
 Commander agent plans the work, and the crew — Researcher, Analyst, Creator,
-Critic, Guardian — comes alive as stylized 3D characters whose state is driven
-entirely by the real mission the Strands-based backend is running.
+Critic, Guardian, Executor — comes alive as stylized 3D characters floating in
+a restrained, paper-white studio environment, whose state is driven entirely
+by the real mission the Strands-based backend is running.
+
+The visual language is deliberately monochrome — off-white paper, white
+surfaces, near-black type, a single warm accent reserved for active/important
+states, and a single red reserved for risk — so that color always means
+something rather than decorating an agent. See `tailwind.config.ts` for the
+full token set (`paper`, `surface`, `ink`, `line`, `accent`, `risk`, `ok`).
 
 Built with Next.js 16 (App Router), React Three Fiber / drei / three, Tailwind
 CSS and Zustand.
@@ -38,14 +45,18 @@ docstring makes the same argument on the backend side):
 ### Why the crew looks like wireframes, not "real" characters
 
 `components/3d/AgentCharacter.tsx` renders each agent as a translucent
-physical-material core plus a bright wireframe edge overlay in that agent's
-signal color — a coherent, replaceable placeholder system built from three.js
-primitives (icosahedron, octahedron, tetrahedron, box, cone, torus,
-dodecahedron), not real character models. `AgentCharacter` accepts an optional
-`modelUrl` for a real GLTF/GLB asset; if it fails to load, `ErrorBoundary.tsx`
-+ `Suspense` fall back to the placeholder without breaking the rest of the
-scene. Swapping in real characters later touches one prop, not the animation,
-layout, or state logic.
+physical-material core plus a bright wireframe edge overlay — a coherent,
+replaceable placeholder system built from three.js primitives (icosahedron,
+octahedron, tetrahedron, box, cone, torus, dodecahedron), not real character
+models. Agents are told apart by geometry and floating labels, never by a
+per-agent brand color — color on a character is reserved entirely for status
+(idle grey, active accent, settled near-black, failed red), so a glance at the
+scene reads as system state rather than decoration. `AgentCharacter` accepts
+an optional `modelUrl` for a real GLTF/GLB asset; if it fails to load,
+`ErrorBoundary.tsx` + `Suspense` fall back to the placeholder without breaking
+the rest of the scene. Swapping in real characters later touches one prop,
+not the animation, layout, or state logic. Clicking a character (live mode
+only) opens the Agent Inspector — see below.
 
 ### Status → animation
 
@@ -56,6 +67,16 @@ frame loop never triggers a re-render. `COMPLETED` and `FAILED` additionally
 arm a one-shot decaying pulse (a brief scale flash, or a brief position
 jitter) the moment a transition is detected — a `useEffect` keyed on `status`,
 not a render-time ref write, per React's rules on ref purity.
+
+### Agent Inspector
+
+Clicking any character during a live mission opens `mission/AgentInspector.tsx`,
+a slide-over panel built entirely from `lib/deriveAgentState.ts`'s
+`computeAgentInspector()` — role, current task, status, tools used, completed
+task count, retries, cumulative duration, a result summary and a risk level,
+all derived from the same event log everything else on the page reads, plus a
+"Runtime process `hion-{id}`" line naming the underlying Strands agent
+process. Nothing in the panel is invented for display purposes.
 
 ## Local development
 
@@ -114,10 +135,13 @@ src/
       DynamicScene.tsx       client-only, code-split Canvas loader
     mission/
       MissionHud.tsx          goal, status, progress, elapsed time
-      ActivityPanel.tsx      collapsible real event feed
+      MissionTimeline.tsx    chronological system-log-style real event record
+      AgentInspector.tsx     per-agent detail panel, opened by clicking a character
       GuardianOverlay.tsx    the approval moment, wired to POST /api/approvals/{id}
       CompletionPanel.tsx    real MissionMetrics + final_result
       ReplayControls.tsx     play/pause/restart/speed over the stored event log
+      SystemStatus.tsx        "System Ready" indicator, backed by GET /api/health
+      StrandsMark.tsx          small "Powered by Strands Agents SDK" credit
   lib/
     types.ts                 mirror of the backend's API schemas
     api.ts                   REST client (create mission, decide approval, …)

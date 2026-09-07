@@ -47,22 +47,20 @@ export function ReplayControls({ onExit }: { onExit: () => void }) {
   };
 
   return (
-    <div className="panel animate-fade-in flex items-center gap-3 rounded-2xl px-4 py-3">
-      <span className="text-[10px] font-semibold uppercase tracking-widest2 text-white/40">Replay</span>
+    <div className="surface-panel animate-fade-in flex items-center gap-3 rounded-lg px-4 py-3">
+      <span className="text-[10px] font-medium uppercase tracking-widest2 text-ink-300">Replay</span>
 
       <button
         type="button"
         onClick={restart}
-        aria-label="Restart"
-        className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-white/70 transition hover:border-white/30 hover:text-white"
+        className="rounded-full border border-line px-3 py-1.5 text-[11px] font-medium text-ink-600 transition hover:border-ink-900/25 hover:text-ink-900"
       >
-        ⟲
+        Restart
       </button>
       <button
         type="button"
         onClick={() => setReplayPlaying(!replayPlaying)}
-        aria-label={replayPlaying ? "Pause" : "Play"}
-        className="rounded-full bg-white/90 px-4 py-1.5 text-[11px] font-semibold text-void-950 transition hover:bg-white"
+        className="rounded-full bg-ink-900 px-4 py-1.5 text-[11px] font-semibold text-paper transition hover:bg-ink-600"
       >
         {replayPlaying ? "Pause" : "Play"}
       </button>
@@ -73,23 +71,23 @@ export function ReplayControls({ onExit }: { onExit: () => void }) {
         max={total}
         value={replayIndex}
         onChange={(e) => setReplayIndex(Number(e.target.value))}
-        className="mx-1 h-1 flex-1 cursor-pointer accent-white/80"
+        className="mx-1 h-1 flex-1 cursor-pointer accent-ink-900"
       />
-      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-white/40">
+      <span className="w-14 shrink-0 text-right font-mono text-[11px] text-ink-300">
         {replayIndex}/{total}
       </span>
 
-      <div className="flex items-center gap-1 border-l border-white/10 pl-3">
+      <div className="flex items-center gap-1 border-l border-line pl-3">
         {SPEEDS.map((speed) => (
           <button
             key={speed}
             type="button"
             onClick={() => setReplaySpeed(speed)}
             className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium transition ${
-              replaySpeed === speed ? "bg-white/15 text-white" : "text-white/35 hover:text-white/60"
+              replaySpeed === speed ? "bg-paper-dim text-ink-900" : "text-ink-300 hover:text-ink-600"
             }`}
           >
-            {speed}×
+            {speed}&times;
           </button>
         ))}
       </div>
@@ -97,7 +95,7 @@ export function ReplayControls({ onExit }: { onExit: () => void }) {
       <button
         type="button"
         onClick={onExit}
-        className="ml-1 shrink-0 rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-white/60 transition hover:border-white/30 hover:text-white"
+        className="ml-1 shrink-0 rounded-full border border-line px-3 py-1.5 text-[11px] text-ink-500 transition hover:border-ink-900/25 hover:text-ink-900"
       >
         Exit replay
       </button>

@@ -11,7 +11,7 @@ export const DynamicScene = dynamic(() => import("./Scene").then((m) => m.Scene)
   ssr: false,
   loading: () => (
     <div className="flex h-full w-full items-center justify-center">
-      <div className="h-1.5 w-1.5 animate-pulse-slow rounded-full bg-signal-research" />
+      <div className="h-1.5 w-1.5 animate-pulse-slow rounded-full bg-accent" />
     </div>
   ),
 });

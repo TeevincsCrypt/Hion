@@ -2,7 +2,7 @@
  * Thin REST client for the Hion backend. No business logic lives here - it
  * only shapes HTTP calls and parses JSON into the types in `./types`.
  */
-import type { Mission, MissionEvent, MissionMetrics } from "./types";
+import type { HealthResponse, Mission, MissionEvent, MissionMetrics } from "./types";
 
 export function apiBaseUrl(): string {
   return process.env.NEXT_PUBLIC_HION_API_URL ?? "http://localhost:8000";
@@ -78,6 +78,11 @@ export function decideApproval(
     method: "POST",
     body: JSON.stringify({ approved, decided_by: decidedBy }),
   }).then(() => undefined);
+}
+
+/** The real backend health check - used to show a genuine "system ready" state, not a decorative one. */
+export function getHealth(): Promise<HealthResponse> {
+  return request<HealthResponse>("/api/health");
 }
 
 export function missionEventStreamUrl(missionId: string): string {
