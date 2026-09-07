@@ -1,0 +1,45 @@
+[project]
+name = "hion"
+version = "0.1.0"
+description = "Hion - an autonomous work management system built on the Strands Agents SDK."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "strands-agents>=1.54.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["strands-agents[anthropic]>=1.54.0"]
+openai = ["strands-agents[openai]>=1.54.0"]
+ollama = ["strands-agents[ollama]>=1.54.0"]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.7.0",
+]
+
+[project.scripts]
+hion = "hion.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hion"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
