@@ -3,6 +3,7 @@
 import { useFrame, useThree } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
 const HOME = new THREE.Vector3(0, 2.1, 9);
 const LOOK_AT = new THREE.Vector3(0, 0.6, 0);
@@ -17,13 +18,17 @@ const DRIFT_RADIUS = 0.35;
 export function CameraRig({ pulledBack }: { pulledBack?: boolean }) {
   const { camera, pointer } = useThree();
   const target = useRef(new THREE.Vector3().copy(LOOK_AT));
+  const reducedMotion = useReducedMotion();
 
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
-    const driftX = Math.sin(t * 0.06) * DRIFT_RADIUS;
-    const driftY = Math.cos(t * 0.045) * (DRIFT_RADIUS * 0.4);
-    const parallaxX = pointer.x * PARALLAX;
-    const parallaxY = pointer.y * PARALLAX * 0.4;
+    // Reduced motion keeps the framing and the pull-back (both carry meaning:
+    // the Guardian moment still recomposes the shot) but drops the ambient
+    // drift and pointer parallax that exist purely for atmosphere.
+    const driftX = reducedMotion ? 0 : Math.sin(t * 0.06) * DRIFT_RADIUS;
+    const driftY = reducedMotion ? 0 : Math.cos(t * 0.045) * (DRIFT_RADIUS * 0.4);
+    const parallaxX = reducedMotion ? 0 : pointer.x * PARALLAX;
+    const parallaxY = reducedMotion ? 0 : pointer.y * PARALLAX * 0.4;
 
     const distance = pulledBack ? 1.35 : 1;
     const desired = new THREE.Vector3(

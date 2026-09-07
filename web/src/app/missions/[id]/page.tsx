@@ -5,13 +5,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AgentRoster } from "@/components/3d/AgentRoster";
 import { DynamicScene } from "@/components/3d/DynamicScene";
+import { AccessibleMissionState } from "@/components/mission/AccessibleMissionState";
 import { AgentInspector } from "@/components/mission/AgentInspector";
 import { CompletionPanel } from "@/components/mission/CompletionPanel";
 import { GuardianOverlay } from "@/components/mission/GuardianOverlay";
 import { MissionHud } from "@/components/mission/MissionHud";
+import { MissionInterrupted } from "@/components/mission/MissionInterrupted";
 import { MissionTimeline } from "@/components/mission/MissionTimeline";
 import { ReplayControls } from "@/components/mission/ReplayControls";
 import { StrandsMark } from "@/components/mission/StrandsMark";
+import { TaskPanel } from "@/components/mission/TaskPanel";
 import type { CharacterId } from "@/lib/agents";
 import {
   computeActivityLabels,
@@ -25,7 +28,8 @@ import { useMissionStore, type ConnectionState } from "@/store/missionStore";
 
 export default function MissionControlPage() {
   const { id } = useParams<{ id: string }>();
-  useMissionEvents(id);
+  const [retryToken, setRetryToken] = useState(0);
+  useMissionEvents(id, retryToken);
 
   const mission = useMissionStore((s) => s.mission);
   const events = useMissionStore((s) => s.events);
@@ -46,12 +50,20 @@ export default function MissionControlPage() {
     };
   }, [mission, events]);
 
+  // An error before the first event means the stream never opened - the
+  // backend is unreachable or the mission does not exist. An error *after*
+  // we have a mission is a transient reconnect, which the header indicator
+  // reports without tearing the whole interface down.
+  if (!mission && connection === "error") {
+    return <MissionInterrupted missionId={id} onRetry={() => setRetryToken((t) => t + 1)} />;
+  }
+
   if (!mission || !derived) {
     return (
       <main className="flex h-dvh items-center justify-center bg-paper">
-        <div className="flex flex-col items-center gap-3 text-ink-500">
+        <div className="flex flex-col items-center gap-3 text-ink-500" role="status">
           <ConnectionIndicator state={connection} />
-          <p className="text-xs">Connecting to mission…</p>
+          <p className="text-xs">Initializing autonomous workforce…</p>
         </div>
       </main>
     );
@@ -61,8 +73,17 @@ export default function MissionControlPage() {
   const showCompletion = mission.status === "COMPLETED" || mission.status === "FAILED";
   const inspectorData = inspecting ? computeAgentInspector(inspecting, mission, events, derived.statuses) : null;
 
+  const latestEvent = events.length > 0 ? events[events.length - 1] : null;
+
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-paper">
+      <AccessibleMissionState
+        mission={mission}
+        statuses={derived.statuses}
+        latestEventText={latestEvent?.message ?? null}
+        onSelect={setInspecting}
+      />
+
       <div className="absolute inset-0">
         <DynamicScene pulledBack={!!pendingApproval} dimmed={!!pendingApproval}>
           <AgentRoster
@@ -92,15 +113,27 @@ export default function MissionControlPage() {
         <div className="pointer-events-auto w-full max-w-xl">
           <MissionHud mission={mission} progress={derived.progress} />
         </div>
-        {/* On phones and tablets the log stacks under the HUD, collapsed by
-            default; at desktop widths it moves to the fixed right rail below
-            instead - a real layout change, not just a shrunk sidebar. */}
-        <div className="pointer-events-auto w-full max-w-xl lg:hidden">
+        {/* On phones and tablets the plan and log stack under the HUD,
+            collapsed by default; at desktop widths they move to the fixed
+            side rails below instead - a real layout change, not just shrunk
+            sidebars. */}
+        <div className="pointer-events-auto w-full max-w-xl space-y-2 lg:hidden">
+          <TaskPanel tasks={mission.tasks} defaultCollapsed />
           <MissionTimeline events={events} defaultCollapsed />
         </div>
       </div>
 
-      <div className="pointer-events-none absolute right-4 top-14 z-10 hidden max-h-[55vh] w-80 lg:block lg:top-16">
+      {/* Desktop: the plan on the left, the record on the right, the agents
+          themselves between them. */}
+      {/* Both rails hang below the centred HUD strip rather than beside it, so
+          the three never collide at the narrow end of `lg`. */}
+      <div className="pointer-events-none absolute left-4 top-44 z-10 hidden max-h-[58vh] w-80 lg:block">
+        <div className="pointer-events-auto h-full">
+          <TaskPanel tasks={mission.tasks} />
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute right-4 top-44 z-10 hidden max-h-[58vh] w-80 lg:block">
         <div className="pointer-events-auto h-full">
           <MissionTimeline events={events} />
         </div>

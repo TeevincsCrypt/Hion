@@ -51,7 +51,13 @@ const EVENT_TYPES: readonly EventType[] = [
   "approval.timed_out",
 ];
 
-export function useMissionEvents(missionId: string): void {
+/**
+ * @param missionId  mission to stream.
+ * @param retryToken change this to tear down the current EventSource and open
+ *   a fresh one. The effect cleanup closes the previous connection first, so
+ *   retrying can never leave two competing streams open.
+ */
+export function useMissionEvents(missionId: string, retryToken = 0): void {
   const hydrate = useMissionStore((s) => s.hydrate);
   const applyEvent = useMissionStore((s) => s.applyEvent);
   const setConnection = useMissionStore((s) => s.setConnection);
@@ -100,5 +106,5 @@ export function useMissionEvents(missionId: string): void {
       }
       source.close();
     };
-  }, [missionId, hydrate, applyEvent, setConnection, reset]);
+  }, [missionId, retryToken, hydrate, applyEvent, setConnection, reset]);
 }

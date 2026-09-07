@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 
 /**
  * A restrained field of drifting motes for atmosphere. Capped low and reused
@@ -10,6 +11,7 @@ import * as THREE from "three";
  * which is both the cinematic choice (subtle, not snowy) and the cheap one.
  */
 export function ParticleField({ count = 260 }: { count?: number }) {
+  const reducedMotion = useReducedMotion();
   const points = useRef<THREE.Points>(null);
   const geometry = useRef<THREE.BufferGeometry>(null);
 
@@ -27,6 +29,9 @@ export function ParticleField({ count = 260 }: { count?: number }) {
 
   useFrame((state) => {
     if (!points.current) return;
+    // Purely atmospheric, so reduced motion parks it: the motes stay in the
+    // scene at a fixed opacity instead of drifting and breathing.
+    if (reducedMotion) return;
     points.current.rotation.y = state.clock.elapsedTime * 0.008;
     const material = points.current.material as THREE.PointsMaterial;
     material.opacity = 0.16 + Math.sin(state.clock.elapsedTime * 0.4) * 0.05;

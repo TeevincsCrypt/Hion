@@ -1,7 +1,10 @@
 "use client";
 
-import type { Mission } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { getMissionMetrics } from "@/lib/api";
+import type { Mission, MissionMetrics } from "@/lib/types";
 import { formatDuration } from "@/lib/useElapsed";
+import { MissionMetricsPanel } from "./MissionMetricsPanel";
 
 interface CompletionPanelProps {
   mission: Mission;
@@ -19,7 +22,23 @@ interface CompletionPanelProps {
  */
 export function CompletionPanel({ mission, mode, agentsInvolved, onReplay }: CompletionPanelProps) {
   const failed = mission.status === "FAILED";
-  const metrics = mission.metrics;
+  const [showAll, setShowAll] = useState(false);
+  // `mission.metrics` arrives on the terminal event and is cast from an
+  // untyped payload; GET /api/missions/{id}/metrics is the typed, authoritative
+  // source, so prefer it and fall back to the event copy if the call fails.
+  const [fetched, setFetched] = useState<MissionMetrics | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getMissionMetrics(mission.id)
+      .then((m) => !cancelled && setFetched(m))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [mission.id]);
+
+  const metrics = fetched ?? mission.metrics;
 
   return (
     <div className="animate-fade-up surface-panel w-full max-w-xl rounded-lg p-8">
@@ -37,6 +56,24 @@ export function CompletionPanel({ mission, mode, agentsInvolved, onReplay }: Com
             <span className="font-semibold">{formatDuration(Math.round(metrics.duration_seconds))}</span>{" "}
             <span className="text-ink-500">elapsed</span>
           </p>
+        </div>
+      )}
+
+      {metrics && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowAll((s) => !s)}
+            aria-expanded={showAll}
+            className="mx-auto block text-[10px] font-medium uppercase tracking-wide2 text-ink-300 transition hover:text-ink-600"
+          >
+            {showAll ? "Hide full metrics" : "Full metrics"}
+          </button>
+          {showAll && (
+            <div className="animate-fade-in mt-4 border-b border-line pb-5">
+              <MissionMetricsPanel metrics={metrics} />
+            </div>
+          )}
         </div>
       )}
 

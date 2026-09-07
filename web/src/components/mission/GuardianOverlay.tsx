@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { decideApproval, HionApiError } from "@/lib/api";
 import type { ApprovalRequest, Mission } from "@/lib/types";
 import { ROSTER } from "@/lib/agents";
@@ -27,6 +27,11 @@ export function GuardianOverlay({
 }) {
   const [deciding, setDeciding] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
 
   const task = mission.tasks.find((t) => t.id === approval.task_id);
   const agentLabel = task ? `${ROSTER[task.assigned_agent].label} Agent` : "Hion";
@@ -45,9 +50,24 @@ export function GuardianOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-paper/70 backdrop-blur-sm">
-      <div className="animate-fade-up surface-panel w-full max-w-md rounded-lg p-8">
-        <p className="text-center text-[10px] font-semibold uppercase tracking-widest2 text-accent">
+    <div
+      className="fixed inset-0 z-30 flex items-center justify-center bg-paper/70 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="guardian-approval-title"
+    >
+      {/* Focus lands on the panel itself, never on a button: this dialog can
+          authorise an irreversible external action, so a stray Enter key must
+          not be able to approve it. */}
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="animate-fade-up surface-panel w-full max-w-md rounded-lg p-8 outline-none"
+      >
+        <p
+          id="guardian-approval-title"
+          className="text-center text-[10px] font-semibold uppercase tracking-widest2 text-accent"
+        >
           Human Decision Required
         </p>
         {approval.rationale && (

@@ -8,6 +8,7 @@ import { CharacterGeometry } from "./CharacterForm";
 import { GLTFCharacter } from "./GLTFCharacter";
 import { ThreeErrorBoundary } from "./ErrorBoundary";
 import type { CharacterId, CharacterStatus, RosterEntry } from "@/lib/agents";
+import { useReducedMotion } from "@/lib/useReducedMotion";
 import type { ActivityLabel } from "@/lib/deriveAgentState";
 
 export interface AgentCharacterProps {
@@ -87,6 +88,7 @@ export function AgentCharacter({
   const completedPulse = useRef(0);
   const failGlitch = useRef(0);
   const [hovered, setHovered] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   // Arms the one-shot flash refs when a status transition happens. The
   // refs themselves are only ever read/decayed inside useFrame, outside
@@ -111,7 +113,11 @@ export function AgentCharacter({
     const t = state.clock.elapsedTime;
 
     const activityLevel = status === "WORKING" || status === "REVIEWING" ? 1 : status === "WAITING" ? 0.2 : 0.4;
-    g.rotation.y += delta * 0.12 * activityLevel;
+    // Under reduced motion the crew holds still: rotation, bob, breathing and
+    // the failure jitter all stop. Status still reads clearly, because status
+    // is carried by colour, emissive intensity and opacity - handled below and
+    // deliberately left running.
+    if (!reducedMotion) g.rotation.y += delta * 0.12 * activityLevel;
 
     let bobAmplitude = 0.05;
     let bobSpeed = 0.55;
@@ -125,18 +131,20 @@ export function AgentCharacter({
       bobAmplitude = 0.015;
       bobSpeed = 0.3;
     }
-    const yOffset = Math.sin(t * bobSpeed + entry.position[0]) * bobAmplitude;
+    const yOffset = reducedMotion ? 0 : Math.sin(t * bobSpeed + entry.position[0]) * bobAmplitude;
 
     let scale = entry.baseScale;
-    if (status === "WORKING") scale *= 1 + Math.sin(t * 2.2) * 0.025;
+    if (status === "WORKING" && !reducedMotion) scale *= 1 + Math.sin(t * 2.2) * 0.025;
     if (dimmed && !focused) scale *= 0.94;
     if (focused || hovered) scale *= 1.07;
     if (completedPulse.current > 0) {
       completedPulse.current = Math.max(0, completedPulse.current - delta);
-      scale *= 1 + (completedPulse.current / COMPLETED_FLASH_SECONDS) * 0.3;
+      // The pulse still decays (the emissive flash below reads from it), but
+      // it stops throwing the geometry around.
+      if (!reducedMotion) scale *= 1 + (completedPulse.current / COMPLETED_FLASH_SECONDS) * 0.3;
     }
 
-    if (failGlitch.current > 0) {
+    if (failGlitch.current > 0 && !reducedMotion) {
       failGlitch.current = Math.max(0, failGlitch.current - delta);
       const jitter = (failGlitch.current / FAILED_GLITCH_SECONDS) * 0.035;
       g.position.x = entry.position[0] + (Math.random() - 0.5) * jitter;
@@ -180,9 +188,9 @@ export function AgentCharacter({
       onPointerOut={onSelect ? () => setHovered(false) : undefined}
     >
       <Float
-        speed={status === "WORKING" ? 2.1 : status === "WAITING" ? 0.55 : 1.1}
-        floatIntensity={status === "WAITING" ? 0.12 : 0.45}
-        rotationIntensity={status === "REVIEWING" ? 0.08 : 0.3}
+        speed={reducedMotion ? 0 : status === "WORKING" ? 2.1 : status === "WAITING" ? 0.55 : 1.1}
+        floatIntensity={reducedMotion ? 0 : status === "WAITING" ? 0.12 : 0.45}
+        rotationIntensity={reducedMotion ? 0 : status === "REVIEWING" ? 0.08 : 0.3}
       >
         {modelUrl ? (
           <ThreeErrorBoundary
@@ -206,8 +214,18 @@ export function AgentCharacter({
         )}
       </Float>
 
+      {/* zIndexRange keeps the floating label above the canvas but *below* the
+          mission panels (z-10). drei defaults to ~16.7M, which puts labels on
+          top of the Task Plan and Mission Log rails and makes both unreadable
+          wherever an agent sits behind one. */}
       {activity && !dimmed && (
-        <Html center distanceFactor={9} occlude={false} position={[0, entry.baseScale * 1.1 + 0.5, 0]}>
+        <Html
+          center
+          distanceFactor={9}
+          occlude={false}
+          zIndexRange={[5, 0]}
+          position={[0, entry.baseScale * 1.1 + 0.5, 0]}
+        >
           <div className="pointer-events-none w-52 -translate-x-1/2 select-none text-center">
             <div className="text-[10px] font-semibold uppercase tracking-wide2 text-ink-900">{entry.label}</div>
             <div className="mt-0.5 text-[11px] leading-snug text-ink-500">{activity.headline}</div>

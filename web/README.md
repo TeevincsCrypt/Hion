@@ -133,16 +133,29 @@ src/
       ParticleField.tsx      ambient motes (one draw call)
       ErrorBoundary.tsx      catches a failed GLTF load
       DynamicScene.tsx       client-only, code-split Canvas loader
+    landing/
+      StorySections.tsx      the scroll narrative under the hero (pipeline,
+                             roster and Guardian gate, all described from the
+                             system's real behaviour)
     mission/
       MissionHud.tsx          goal, status, progress, elapsed time
+      TaskPanel.tsx           the real task graph: status, dependencies,
+                              retries, critique, guardian verdict, result
       MissionTimeline.tsx    chronological system-log-style real event record
       AgentInspector.tsx     per-agent detail panel, opened by clicking a character
+      AccessibleMissionState.tsx  aria-live mission narration + the keyboard
+                              route into the inspector (the 3D characters are
+                              pointer targets, so this is not optional)
       GuardianOverlay.tsx    the approval moment, wired to POST /api/approvals/{id}
-      CompletionPanel.tsx    real MissionMetrics + final_result
-      ReplayControls.tsx     play/pause/restart/speed over the stored event log
+      CompletionPanel.tsx    headline stats + final_result
+      MissionMetricsPanel.tsx full MissionMetrics from GET /api/missions/{id}/metrics
+      MissionInterrupted.tsx  unreachable-backend state, with folded diagnostics
+      ReplayControls.tsx     play/pause/restart/scrub/speed over the stored log
       SystemStatus.tsx        "System Ready" indicator, backed by GET /api/health
       StrandsMark.tsx          small "Powered by Strands Agents SDK" credit
   lib/
+    useReducedMotion.ts      prefers-reduced-motion for the 3D layer, which no
+                             stylesheet can reach (see below)
     types.ts                 mirror of the backend's API schemas
     api.ts                   REST client (create mission, decide approval, …)
     useMissionEvents.ts       the SSE hook
@@ -152,6 +165,24 @@ src/
   store/
     missionStore.ts           zustand store: mission, events, replay state
 ```
+
+## Accessibility and reduced motion
+
+The 3D scene is the product, which makes it a hazard: an interface whose state
+is only legible as floating geometry excludes anyone not looking at it.
+`AccessibleMissionState.tsx` is the counterweight - a polite `aria-live` region
+narrating real mission status and the latest event, plus a visually-hidden
+(focus-revealed) agent roster that opens the Agent Inspector from the keyboard,
+since the 3D characters themselves are pointer targets. The Guardian dialog is
+a real `role="dialog"`, and focus deliberately lands on the panel rather than a
+button so a stray Enter can never authorise an irreversible action.
+
+`globals.css` damps CSS animation under `prefers-reduced-motion`, but the 3D
+layer animates inside `useFrame` where no stylesheet reaches. `useReducedMotion`
+lets the scene drop *ambient* motion - camera drift and parallax, idle rotation,
+float bob, particle drift, the failure jitter - while keeping everything that
+carries meaning: status colour, emissive intensity, opacity, the Guardian
+pull-back. Simplified, not switched off.
 
 ## Replay
 
