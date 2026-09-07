@@ -23,7 +23,7 @@ def settings(tmp_path: Path) -> Settings:
         max_revisions=2,
         max_concurrency=3,
         auto_approve_max_risk=RiskLevel.MEDIUM,
-        on_revisions_exhausted="accept",
+        on_revisions_exhausted="fail",
         approval_timeout_seconds=10,
         search_provider="none",
         external_webhook_url=None,

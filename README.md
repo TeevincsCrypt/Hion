@@ -15,12 +15,15 @@ and streamed live.
 
 ## Status
 
-Backend foundation, complete and tested end to end. No UI yet — that is the next
-layer, and the event stream is shaped for it.
+Backend and agent brain, complete and tested end to end. No UI yet — that is the
+next layer, and the event stream is shaped for it.
 
 ```
-51 tests passing · ruff clean · Strands Agents SDK 1.54
+95 tests passing · ruff clean · mypy clean · Strands Agents SDK 1.54
 ```
+
+`hion doctor` confirms whether a real model is currently reachable in your
+environment, and `hion verify` runs the full lifecycle against it.
 
 ---
 
@@ -143,6 +146,18 @@ uv venv && uv pip install -e '.[dev]'
 cp .env.example .env      # then set your provider credentials
 ```
 
+**Check the provider actually works before running a mission:**
+
+```bash
+hion doctor
+```
+
+This makes one real, cheap call to whatever provider is configured and reports
+`REACHABLE` or `UNREACHABLE` with an actionable reason — an invalid or expired
+credential, a model not enabled for the account, wrong region, no network
+route. `hion run` and `hion serve` both refuse to start a mission against a
+provider that fails this check rather than failing deep inside a mission.
+
 Run a mission in the terminal, with a live event feed:
 
 ```bash
@@ -156,16 +171,35 @@ Or serve the API:
 hion serve            # http://localhost:8000/docs
 ```
 
+**Run the full lifecycle against a real model and get a pass/fail report:**
+
+```bash
+hion verify
+```
+
+Runs the reference mission for real and checks every stage of the lifecycle
+against what actually happened — the plan, delegation, tool use, critique,
+Guardian assessment, completion — from the mission's own event log. Exits
+non-zero if anything is missing.
+
 ### Model providers
 
 Provider-agnostic by design — the engine only ever sees a `strands.models.Model`.
+No credential is ever hardcoded; everything comes from the environment.
 
 ```bash
-HION_MODEL_PROVIDER=bedrock    # default, no extra needed
-HION_MODEL_PROVIDER=anthropic  # pip install 'hion[anthropic]'
-HION_MODEL_PROVIDER=openai     # pip install 'hion[openai]'
-HION_MODEL_PROVIDER=ollama     # pip install 'hion[ollama]'
+HION_MODEL_PROVIDER=auto       # default: Bedrock if AWS credentials are present,
+                                # else falls back to an API-key provider
+HION_MODEL_PROVIDER=bedrock    # pin explicitly, no extra needed
+HION_MODEL_PROVIDER=anthropic  # pip install 'hion[anthropic]'; needs HION_MODEL_API_KEY
+HION_MODEL_PROVIDER=openai     # pip install 'hion[openai]'; needs HION_MODEL_API_KEY
+HION_MODEL_PROVIDER=ollama     # pip install 'hion[ollama]'; local, no key needed
 ```
+
+With nothing configured, startup fails immediately with the exact environment
+variables to set — never with a stack trace from inside a running mission. A
+configured-but-broken provider (revoked key, wrong region, model not enabled)
+is diagnosed the same way, in one sentence naming the cause and the fix.
 
 ---
 
@@ -177,10 +211,13 @@ HION_MODEL_PROVIDER=ollama     # pip install 'hion[ollama]'
 | `GET` | `/api/missions` | List missions, newest first. |
 | `GET` | `/api/missions/{id}` | Full mission state: tasks, critiques, verdicts, approvals, result. |
 | `GET` | `/api/missions/{id}/events` | Recorded events. `?after=N` for incremental polling. |
+| `GET` | `/api/missions/{id}/metrics` | `MissionMetrics`: tasks, retries, tool calls, approvals, tokens, duration. |
 | `GET` | `/api/missions/{id}/events/stream` | **SSE**: replays the log, then streams live. |
 | `GET` | `/api/approvals` | Approvals waiting on a human. `?mission_id=` to filter. |
 | `POST` | `/api/approvals/{id}` | Grant or reject, resuming the suspended mission. |
-| `GET` | `/api/health` | Liveness and effective configuration. |
+| `GET` | `/api/health` | Liveness and effective configuration (whether a provider is even configured). |
+| `GET` | `/api/health/provider` | Makes one real call to the model provider; reports reachable or the diagnosed cause. |
+| `GET` | `/api/risk-policy` | The risk tiers the Guardian's tool gate actually enforces. |
 
 ```bash
 curl -X POST localhost:8000/api/missions \
@@ -192,18 +229,40 @@ curl -N localhost:8000/api/missions/msn_abc123/events/stream
 
 ### Events
 
-Every event carries `id`, `sequence`, `type`, `task_id`, `agent`, `message`, a
-typed `data` payload and a timestamp — enough for a Mission Control UI to render
-the stream without re-deriving state.
+Every event carries `id`, `sequence`, `mission_id`, `task_id`, `agent`, `type`,
+`message`, `status`, `duration_ms`, `retry_count`, `tool_name`, `risk_level`,
+`error`, a truncated `result_summary`, a typed `data` payload, and a timestamp —
+enough for a Mission Control UI to render the stream without re-deriving state.
+
+Only text output ever reaches an event or a task result. Reasoning content
+blocks are dropped at the point output is read from the model, so hidden
+chain-of-thought can never appear in the log, the API, or `result_summary` —
+observability here means recorded actions and decisions, not internal reasoning.
 
 ```
-mission.created     mission.planned      mission.completed    mission.failed
-task.created        task.started         task.completed       task.failed        task.retrying
+mission.created     mission.planned      mission.completed    mission.failed      plan.warning
+task.created        task.started         task.completed       task.failed         task.retrying
 agent.started       agent.completed      agent.failed
 tool.started        tool.completed       tool.blocked
 critic.started      critic.completed     revision.requested   revision.exhausted
-guardian.review     approval.required    approval.granted     approval.rejected  approval.timed_out
+guardian.review     approval.required    approval.granted     approval.rejected   approval.timed_out
 ```
+
+### Metrics
+
+`GET /api/missions/{id}/metrics` returns a `MissionMetrics` snapshot, computed
+from the mission's own tasks and event log — so it can never disagree with the
+activity stream a UI renders from the same data:
+
+```
+total_tasks · completed_tasks · failed_tasks · tasks_accepted_with_open_critique
+retries · revisions_requested · agent_invocations · tool_calls · tool_calls_blocked
+approvals_requested/granted/rejected/timed_out · events_recorded
+input/output/total_tokens · average_critic_score · duration_seconds
+```
+
+A running mission returns a live snapshot of the same shape; a finished one
+returns the snapshot taken at completion.
 
 ---
 
@@ -211,17 +270,24 @@ guardian.review     approval.required    approval.granted     approval.rejected 
 
 ```
 hion/
-  config.py              HION_*-prefixed settings
-  domain/                enums + the mission/task/event/critique/verdict models
+  config.py              HION_*-prefixed settings; auto/bedrock/anthropic/openai/ollama resolution
+  verify.py              hion verify: real-model lifecycle checks against the reference mission
+  domain/                enums + the mission/task/event/critique/verdict/metrics models
   events/                event bus (live fan-out) and recorder (the single write path)
   store/                 mission persistence behind a swappable protocol
-  llm/provider.py        Strands Model factory: bedrock | anthropic | openai | ollama
+  llm/
+    provider.py            Strands Model factory: bedrock | anthropic | openai | ollama
+    preflight.py           one real call to confirm a provider works; translates
+                            provider errors into one actionable sentence
   tools/                 the executor: workspace, research, external, risk policy, per-role registry
-  hooks/                 telemetry hook and the Guardian's tool gate
+  hooks/                 telemetry hook, the Guardian's tool gate, and the SDK-internal-tool filter
   agents/                prompts, agent factory, Commander, Critic, Guardian, specialist runner
-  orchestration/         the mission engine and the approval registry
+  orchestration/
+    engine.py              the mission engine
+    approvals.py           the approval registry
+    metrics.py             MissionMetrics computed from mission state and events
   api/                   FastAPI app, routes, schemas, DI container
-  cli.py                 hion serve | hion run
+  cli.py                 hion serve | run | doctor | verify
 tests/
   support/               the scripted model provider and the reference scenario
 ```
@@ -231,8 +297,9 @@ tests/
 ## Testing
 
 ```bash
-pytest        # 51 tests
+pytest              # 95 tests
 ruff check .
+mypy                # optional dev dependency; pyproject.toml configures it
 ```
 
 The suite runs the **real** agents, tool pipeline, hooks and engine. Only the
@@ -245,8 +312,24 @@ assertions like these possible without a paid API call:
   Creator's next prompt;
 - the Creator's attempt to call `publish_external` is really blocked by the
   Guardian's hook, and recorded as `blocked` rather than as done;
+- an unclassified tool name is treated as HIGH risk and blocked, every time it
+  is attempted, not just the first;
 - `save_dataset` and `update_file` really write files to disk;
-- a human "no" really fails the task, and the Creator never runs.
+- a human "no" really fails the task, and the Creator never runs;
+- a Critic that never approves still terminates at `HION_MAX_REVISIONS`, and by
+  default fails the task with an explanation naming the score, the weakest
+  evaluation dimension, and what was still outstanding — never accepted
+  silently and never looped forever;
+- a model that answers in prose where a `MissionPlan` or `Critique` was
+  required fails just that step, with a typed `MalformedModelOutput` error,
+  not a crash;
+- a Guardian or Critic invocation that raises fails only the task it was
+  judging, not every task running concurrently with it;
+- mission metrics agree exactly with the event log they were computed from,
+  including on a mission that failed outright.
+
+`hion verify` is the real-model equivalent of the lifecycle test: same
+assertions, run against whatever provider is actually configured.
 
 ---
 

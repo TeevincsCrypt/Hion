@@ -27,32 +27,37 @@ class ModelFactory(Protocol):
 def build_model(settings: Settings) -> Model:
     """Construct the configured Strands model provider.
 
+    Credentials are never read from anywhere but the environment - there are no
+    defaults, and nothing is embedded in the code.
+
     Raises:
-        ConfigurationError: the provider is unknown, or its optional extra is
-            not installed, or a required credential is missing.
+        ConfigurationError: no provider is configured, the provider is unknown,
+            its optional extra is not installed, or a required credential is missing.
     """
-    provider = settings.model_provider
+    provider = settings.resolve_provider()
     builder = _BUILDERS.get(provider)
     if builder is None:
         raise ConfigurationError(
-            f"Unknown HION_MODEL_PROVIDER {provider!r}. Expected one of {sorted(_BUILDERS)}."
+            f"Unknown HION_MODEL_PROVIDER {provider!r}. "
+            f"Expected 'auto' or one of {sorted(_BUILDERS)}."
         )
-    logger.info("Building %s model %s", provider, settings.model_id)
-    return builder(settings)
+    model_id = settings.resolve_model_id(provider)
+    logger.info("Using %s model %s", provider, model_id)
+    return builder(settings, model_id)
 
 
-def _build_bedrock(settings: Settings) -> Model:
+def _build_bedrock(settings: Settings, model_id: str) -> Model:
     from strands.models import BedrockModel
 
     return BedrockModel(
-        model_id=settings.model_id,
+        model_id=model_id,
         region_name=settings.aws_region,
         max_tokens=settings.max_tokens,
         temperature=settings.temperature,
     )
 
 
-def _build_anthropic(settings: Settings) -> Model:
+def _build_anthropic(settings: Settings, model_id: str) -> Model:
     try:
         from strands.models.anthropic import AnthropicModel
     except ImportError as exc:  # pragma: no cover - depends on install extras
@@ -68,13 +73,13 @@ def _build_anthropic(settings: Settings) -> Model:
         client_args["base_url"] = settings.model_base_url
     return AnthropicModel(
         client_args=client_args,
-        model_id=settings.model_id,
+        model_id=model_id,
         max_tokens=settings.max_tokens,
         params={"temperature": settings.temperature},
     )
 
 
-def _build_openai(settings: Settings) -> Model:
+def _build_openai(settings: Settings, model_id: str) -> Model:
     try:
         from strands.models.openai import OpenAIModel
     except ImportError as exc:  # pragma: no cover - depends on install extras
@@ -90,12 +95,12 @@ def _build_openai(settings: Settings) -> Model:
         client_args["base_url"] = settings.model_base_url
     return OpenAIModel(
         client_args=client_args,
-        model_id=settings.model_id,
+        model_id=model_id,
         params={"temperature": settings.temperature, "max_tokens": settings.max_tokens},
     )
 
 
-def _build_ollama(settings: Settings) -> Model:
+def _build_ollama(settings: Settings, model_id: str) -> Model:
     try:
         from strands.models.ollama import OllamaModel
     except ImportError as exc:  # pragma: no cover - depends on install extras
@@ -105,7 +110,7 @@ def _build_ollama(settings: Settings) -> Model:
 
     return OllamaModel(
         host=settings.model_base_url or "http://localhost:11434",
-        model_id=settings.model_id,
+        model_id=model_id,
         temperature=settings.temperature,
     )
 

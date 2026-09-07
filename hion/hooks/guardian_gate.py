@@ -13,7 +13,8 @@ from strands.hooks import BeforeToolCallEvent, HookProvider, HookRegistry
 
 from hion.domain.enums import AgentName, EventType, RiskLevel
 from hion.events.recorder import MissionRecorder
-from hion.tools.risk import risk_for_tool
+from hion.hooks._sdk import is_sdk_internal_tool
+from hion.tools.risk import TOOL_RISK, risk_for_tool
 
 
 class GuardianToolGate(HookProvider):
@@ -40,13 +41,12 @@ class GuardianToolGate(HookProvider):
         registry.add_callback(BeforeToolCallEvent, self._gate)
 
     def _gate(self, event: BeforeToolCallEvent) -> None:
-        if getattr(event.selected_tool, "is_dynamic", False):
-            # Tools the SDK registers on the fly - currently the structured-output
-            # tool - are machinery, not mission actions. Hion registers no dynamic
-            # tools of its own, so this cannot be used to smuggle one past the gate.
+        tool_name = event.tool_use["name"]
+        if is_sdk_internal_tool(event.agent, tool_name):
+            # SDK machinery, not a mission action. Hion registers no dynamic tools
+            # of its own, so this cannot be used to smuggle one past the gate.
             return
 
-        tool_name = event.tool_use["name"]
         risk = risk_for_tool(tool_name)
         if risk <= self._ceiling:
             return
@@ -64,7 +64,10 @@ class GuardianToolGate(HookProvider):
             message=f"Guardian blocked {tool_name} ({risk.value} > {self._ceiling.value})",
             task_id=self._task_id,
             agent=self._agent,
+            status="blocked",
             tool_name=tool_name,
-            tool_risk=risk.value,
+            risk_level=risk,
+            error=reason,
             approved_ceiling=self._ceiling.value,
+            unclassified_tool=tool_name not in TOOL_RISK,
         )

@@ -91,6 +91,23 @@ def build_workspace_tools(ctx: ExecutionContext) -> list[DecoratedFunctionTool]:
         return {"status": "ok", "count": len(files), "files": files}
 
     @tool
+    def delete_file(path: str) -> dict[str, Any]:
+        """Delete a file from the mission workspace.
+
+        Destructive and not undoable, so it is a MEDIUM-risk action. Prefer
+        update_file when you mean to replace content rather than remove it.
+
+        Args:
+            path: Relative path of an existing file inside the mission workspace.
+        """
+        target = ctx.resolve(path)
+        if not target.is_file():
+            return {"status": "error", "error": f"{path} does not exist."}
+        size = target.stat().st_size
+        target.unlink()
+        return {"status": "ok", "path": path, "deleted_bytes": size}
+
+    @tool
     def save_dataset(name: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
         """Save structured records as a JSON dataset in the mission workspace.
 
@@ -120,4 +137,4 @@ def build_workspace_tools(ctx: ExecutionContext) -> list[DecoratedFunctionTool]:
         rows = json.loads(target.read_text(encoding="utf-8"))
         return {"status": "ok", "name": name, "rows": rows}
 
-    return [write_file, update_file, read_file, list_files, save_dataset, load_dataset]
+    return [write_file, update_file, delete_file, read_file, list_files, save_dataset, load_dataset]

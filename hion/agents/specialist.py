@@ -69,17 +69,20 @@ Required changes:
 
 Critic's reasoning: {reasoning}
 
-Revise your work so every required change is addressed. Return the full revised
-deliverable, not a diff and not a description of what you changed.
+This is attempt {attempt} of {max_attempts}. Revise your work so every required
+change is addressed. Return the full revised deliverable, not a diff and not a
+description of what you changed. If a required change cannot be made because the
+research does not support it, say so explicitly rather than inventing support.
 """
 
 
 class SpecialistRunner:
     """Runs research / analyst / creator tasks through Strands."""
 
-    def __init__(self, factory: AgentFactory, recorder: MissionRecorder) -> None:
+    def __init__(self, factory: AgentFactory, recorder: MissionRecorder, max_attempts: int) -> None:
         self._factory = factory
         self._recorder = recorder
+        self._max_attempts = max_attempts
 
     async def run(
         self,
@@ -113,6 +116,8 @@ class SpecialistRunner:
                 issues=_bullets(critique.issues),
                 required_changes=_bullets(critique.required_changes),
                 reasoning=critique.reasoning or "(none given)",
+                attempt=task.retry_count + 1,
+                max_attempts=self._max_attempts,
             )
         else:
             prompt = _TASK_PROMPT.format(

@@ -8,7 +8,13 @@ human approval before the brief is written.
 from __future__ import annotations
 
 from hion.domain.enums import AgentName, RiskLevel
-from hion.domain.models import Critique, GuardianVerdict, MissionPlan, PlannedTask
+from hion.domain.models import (
+    Critique,
+    CritiqueDimensions,
+    GuardianVerdict,
+    MissionPlan,
+    PlannedTask,
+)
 from tests.support.scripted_model import ScriptedTool
 
 GOAL = (
@@ -90,8 +96,25 @@ ATTEMPT_PUBLISH = ScriptedTool(
 WRITE_BRIEF_FILE = ScriptedTool(name="write_file", input={"path": "brief.md", "content": DRAFT_BRIEF})
 UPDATE_BRIEF_FILE = ScriptedTool(name="update_file", input={"path": "brief.md", "content": FINAL_BRIEF})
 
+def _dimensions(score: int) -> CritiqueDimensions:
+    """Uniform dimension scores, for cases where the axis breakdown is not the point."""
+    return CritiqueDimensions(
+        factual_support=score,
+        completeness=score,
+        consistency=score,
+        task_compliance=score,
+        source_quality=score,
+        actionable_usefulness=score,
+    )
+
+
 APPROVE = Critique(
-    approved=True, score=91, issues=[], required_changes=[], reasoning="Meets every criterion."
+    approved=True,
+    score=91,
+    issues=[],
+    required_changes=[],
+    dimensions=_dimensions(90),
+    reasoning="Meets every criterion.",
 )
 REJECT_DRAFT = Critique(
     approved=False,
@@ -102,6 +125,14 @@ REJECT_DRAFT = Critique(
         "Cite a source URL for each claim",
         "State the recommendation up front",
     ],
+    dimensions=CritiqueDimensions(
+        factual_support=35,
+        completeness=40,
+        consistency=70,
+        task_compliance=50,
+        source_quality=20,
+        actionable_usefulness=45,
+    ),
     reasoning="The draft does not meet the acceptance criteria.",
 )
 

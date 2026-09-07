@@ -33,3 +33,11 @@ class ApprovalNotFound(HionError):
 
 class ToolBlocked(HionError):
     """The Guardian refused to let a tool call execute."""
+
+
+class ProviderUnavailable(ConfigurationError):
+    """A model provider is configured but cannot actually be reached."""
+
+
+class MalformedModelOutput(HionError):
+    """An agent finished without producing the structured output it was asked for."""

@@ -27,6 +27,7 @@ class Container:
     bus: EventBus
     approvals: ApprovalRegistry
     engine: MissionEngine
+    model_factory: ModelFactory
 
 
 def build_container(
@@ -53,7 +54,14 @@ def build_container(
         approvals=approvals,
         model_factory=model_factory,
     )
-    return Container(settings=settings, store=store, bus=bus, approvals=approvals, engine=engine)
+    return Container(
+        settings=settings,
+        store=store,
+        bus=bus,
+        approvals=approvals,
+        engine=engine,
+        model_factory=model_factory,
+    )
 
 
 def _lazy_singleton(factory):

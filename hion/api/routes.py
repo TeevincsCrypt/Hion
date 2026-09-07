@@ -21,8 +21,11 @@ from hion.api.schemas import (
     MissionView,
 )
 from hion.domain.enums import EventType
-from hion.domain.models import MissionEvent
-from hion.errors import ApprovalNotFound, MissionNotFound
+from hion.domain.models import MissionEvent, MissionMetrics
+from hion.errors import ApprovalNotFound, ConfigurationError, MissionNotFound
+from hion.llm.preflight import check_provider
+from hion.orchestration.metrics import compute_metrics
+from hion.tools.risk import RISK_POLICY
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,17 @@ async def list_missions(deps: Deps, limit: int = Query(default=50, ge=1, le=200)
 async def get_mission(mission_id: str, deps: Deps) -> MissionView:
     """Retrieve a mission's full current state."""
     return MissionView.of(_mission_or_404(deps, mission_id))
+
+
+@router.get("/missions/{mission_id}/metrics", response_model=MissionMetrics)
+async def get_mission_metrics(mission_id: str, deps: Deps) -> MissionMetrics:
+    """Mission statistics.
+
+    Finished missions return the metrics computed when they ended; a running
+    mission returns a live snapshot of the same shape.
+    """
+    mission = _mission_or_404(deps, mission_id)
+    return mission.metrics or compute_metrics(mission)
 
 
 @router.get("/missions/{mission_id}/events", response_model=list[EventView])
@@ -135,13 +149,60 @@ async def decide_approval(approval_id: str, body: ApprovalDecision, deps: Deps) 
 @router.get("/health")
 async def health(deps: Deps) -> dict[str, object]:
     """Liveness plus the configuration the process is actually running with."""
+    settings = deps.settings
+    provider: str
+    model_id: str | None
+    try:
+        provider = settings.resolve_provider()
+        model_id = settings.resolve_model_id(provider)
+        configured = True
+        detail = "A model provider is configured. Call /api/health/provider to verify it answers."
+    except ConfigurationError as exc:
+        provider, model_id, configured, detail = settings.model_provider, None, False, str(exc)
+
     return {
-        "status": "ok",
-        "model_provider": deps.settings.model_provider,
-        "model_id": deps.settings.model_id,
-        "max_revisions": deps.settings.max_revisions,
-        "auto_approve_max_risk": deps.settings.auto_approve_max_risk.value,
+        "status": "ok" if configured else "misconfigured",
+        "model_provider": provider,
+        "model_id": model_id,
+        "provider_configured": configured,
+        "detail": detail,
+        "max_revisions": settings.max_revisions,
+        "on_revisions_exhausted": settings.on_revisions_exhausted,
+        "auto_approve_max_risk": settings.auto_approve_max_risk.value,
+        "critic_approval_threshold": settings.critic_approval_threshold,
+        "critic_min_dimension_score": settings.critic_min_dimension_score,
         "event_types": [e.value for e in EventType],
+    }
+
+
+@router.get("/health/provider")
+async def provider_health(deps: Deps) -> dict[str, object]:
+    """Make one real call to the model provider and report whether it worked.
+
+    This is the check that distinguishes "credentials are present" from
+    "credentials work". It costs one tiny completion.
+    """
+    try:
+        model = deps.model_factory()
+    except ConfigurationError as exc:
+        return {
+            "provider": deps.settings.model_provider,
+            "model_id": deps.settings.model_id,
+            "reachable": False,
+            "detail": str(exc),
+        }
+    status = await check_provider(model, deps.settings)
+    return status.as_dict()
+
+
+@router.get("/risk-policy")
+async def risk_policy(deps: Deps) -> dict[str, object]:
+    """The risk tiers the Guardian's tool gate actually enforces."""
+    return {
+        "tiers": RISK_POLICY,
+        "auto_approve_max_risk": deps.settings.auto_approve_max_risk.value,
+        "high_always_requires_approval": True,
+        "unknown_tools_are_high": True,
     }
 
 

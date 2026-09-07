@@ -8,7 +8,15 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from hion.domain.enums import AgentName, MissionStatus, RiskLevel, TaskStatus
-from hion.domain.models import ApprovalRequest, Critique, GuardianVerdict, Mission, MissionEvent, Task
+from hion.domain.models import (
+    ApprovalRequest,
+    Critique,
+    GuardianVerdict,
+    Mission,
+    MissionEvent,
+    MissionMetrics,
+    Task,
+)
 
 
 class CreateMissionRequest(BaseModel):
@@ -45,6 +53,13 @@ class EventView(BaseModel):
     task_id: str | None
     agent: AgentName | None
     message: str
+    status: str | None
+    duration_ms: int | None
+    retry_count: int | None
+    tool_name: str | None
+    risk_level: RiskLevel | None
+    error: str | None
+    result_summary: str | None
     data: dict[str, Any]
     created_at: datetime
 
@@ -66,6 +81,7 @@ class MissionView(BaseModel):
     approvals: list[ApprovalRequest]
     final_result: str | None
     error: str | None
+    metrics: MissionMetrics | None
     event_count: int
     created_at: datetime
     updated_at: datetime
@@ -83,6 +99,7 @@ class MissionView(BaseModel):
             approvals=mission.approvals,
             final_result=mission.final_result,
             error=mission.error,
+            metrics=mission.metrics,
             event_count=len(mission.events),
             created_at=mission.created_at,
             updated_at=mission.updated_at,

@@ -91,9 +91,11 @@ async def test_guardian_blocks_an_unapproved_high_risk_tool(make_container):
 
     blocked = [e for e in mission.events if e.type is EventType.TOOL_BLOCKED]
     assert len(blocked) == 1
-    assert blocked[0].data["tool_name"] == "publish_external"
-    assert blocked[0].data["tool_risk"] == RiskLevel.HIGH.value
+    assert blocked[0].tool_name == "publish_external"
+    assert blocked[0].risk_level is RiskLevel.HIGH
+    assert blocked[0].status == "blocked"
     assert blocked[0].data["approved_ceiling"] == RiskLevel.MEDIUM.value
+    assert blocked[0].data["unclassified_tool"] is False
 
     # Nothing was published, and the tool call is recorded as blocked, not as done.
     brief = mission.tasks[-1]
@@ -221,7 +223,7 @@ async def test_revision_budget_is_finite(make_container):
     script = scenarios.reference_script()
     script["creator"] = [scenarios.DRAFT_BRIEF] * 4
     script["critic"] = [scenarios.APPROVE, scenarios.APPROVE] + [scenarios.REJECT_DRAFT] * 3
-    container, _ = make_container(script)
+    container, _ = make_container(script, on_revisions_exhausted="accept")
 
     mission = await _run_reference_mission(container)
     brief = mission.tasks[-1]

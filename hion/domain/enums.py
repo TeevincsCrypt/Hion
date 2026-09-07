@@ -54,22 +54,22 @@ class RiskLevel(StrEnum):
     def rank(self) -> int:
         return _RISK_RANK[self]
 
-    def __ge__(self, other: object) -> bool:  # type: ignore[override]
+    def __ge__(self, other: object) -> bool:
         if not isinstance(other, RiskLevel):
             return NotImplemented
         return self.rank >= other.rank
 
-    def __gt__(self, other: object) -> bool:  # type: ignore[override]
+    def __gt__(self, other: object) -> bool:
         if not isinstance(other, RiskLevel):
             return NotImplemented
         return self.rank > other.rank
 
-    def __le__(self, other: object) -> bool:  # type: ignore[override]
+    def __le__(self, other: object) -> bool:
         if not isinstance(other, RiskLevel):
             return NotImplemented
         return self.rank <= other.rank
 
-    def __lt__(self, other: object) -> bool:  # type: ignore[override]
+    def __lt__(self, other: object) -> bool:
         if not isinstance(other, RiskLevel):
             return NotImplemented
         return self.rank < other.rank
@@ -94,6 +94,7 @@ class EventType(StrEnum):
 
     MISSION_CREATED = "mission.created"
     MISSION_PLANNED = "mission.planned"
+    PLAN_WARNING = "plan.warning"
     MISSION_COMPLETED = "mission.completed"
     MISSION_FAILED = "mission.failed"
 

@@ -69,11 +69,55 @@ class MissionPlan(BaseModel):
     tasks: list[PlannedTask] = Field(description="Ordered task graph, 2-6 tasks.")
 
 
+class CritiqueDimensions(BaseModel):
+    """Per-dimension scores behind the Critic's overall verdict.
+
+    Scoring each axis separately makes a rubber-stamp approval visible: a result
+    cannot be approved on vibes while one dimension is failing.
+    """
+
+    factual_support: int = Field(
+        ge=0, le=100, description="Are the claims accurate and backed by the cited evidence?"
+    )
+    completeness: int = Field(
+        ge=0, le=100, description="Is every part of the task and every acceptance criterion covered?"
+    )
+    consistency: int = Field(
+        ge=0, le=100, description="Is it free of internal contradictions and conflicts with upstream results?"
+    )
+    task_compliance: int = Field(
+        ge=0, le=100, description="Did the agent do the task it was given, in the form it was asked for?"
+    )
+    source_quality: int = Field(
+        ge=0,
+        le=100,
+        description=(
+            "Are sources present, primary where it matters, and actually cited? "
+            "Score 100 when the task genuinely needs no sources."
+        ),
+    )
+    actionable_usefulness: int = Field(
+        ge=0, le=100, description="Could the intended audience act on this as-is?"
+    )
+
+    def as_dict(self) -> dict[str, int]:
+        return self.model_dump()
+
+    def weakest(self) -> tuple[str, int]:
+        """The lowest-scoring dimension, as (name, score)."""
+        scores = self.as_dict()
+        name = min(scores, key=lambda key: scores[key])
+        return name, scores[name]
+
+
 class Critique(BaseModel):
     """The Critic's structured evaluation of another agent's result."""
 
     approved: bool = Field(description="True only if the result genuinely completes the task.")
     score: int = Field(ge=0, le=100, description="Overall quality score from 0 to 100.")
+    dimensions: CritiqueDimensions | None = Field(
+        default=None, description="Score for each evaluation dimension."
+    )
     issues: list[str] = Field(
         default_factory=list,
         description="Specific defects found: incorrect claims, contradictions, gaps, unsupported assertions.",
@@ -143,6 +187,32 @@ class ApprovalRequest(BaseModel):
     note: str | None = None
 
 
+class MissionMetrics(BaseModel):
+    """Aggregate mission statistics, computed once the mission reaches a terminal state."""
+
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    failed_tasks: int = 0
+    tasks_accepted_with_open_critique: int = 0
+    retries: int = 0
+    agent_invocations: int = 0
+    tool_calls: int = 0
+    tool_calls_blocked: int = 0
+    approvals_requested: int = 0
+    approvals_granted: int = 0
+    approvals_rejected: int = 0
+    approvals_timed_out: int = 0
+    revisions_requested: int = 0
+    events_recorded: int = 0
+    duration_seconds: float = 0.0
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    average_critic_score: float | None = None
+
+
 class Task(BaseModel):
     """A unit of delegated work inside a mission."""
 
@@ -169,7 +239,16 @@ class Task(BaseModel):
 
 
 class MissionEvent(BaseModel):
-    """An immutable record of something that happened during a mission."""
+    """An immutable record of something that happened during a mission.
+
+    The envelope carries the fields a Mission Control UI filters and groups on;
+    ``data`` holds whatever else is specific to the event type.
+
+    It records *actions and decisions* - what an agent did, what it decided, how
+    long it took. It deliberately does not carry model reasoning traces: agent
+    output is read from text content blocks only, so hidden reasoning never
+    reaches the event log.
+    """
 
     id: str = Field(default_factory=lambda: _new_id("evt"))
     mission_id: str
@@ -178,6 +257,15 @@ class MissionEvent(BaseModel):
     task_id: str | None = None
     agent: AgentName | None = None
     message: str = ""
+    status: str | None = Field(default=None, description="Outcome of the thing this event describes.")
+    duration_ms: int | None = Field(default=None, description="How long it took, where measurable.")
+    retry_count: int | None = Field(default=None, description="Attempt number for the owning task.")
+    tool_name: str | None = None
+    risk_level: RiskLevel | None = None
+    error: str | None = None
+    result_summary: str | None = Field(
+        default=None, description="Truncated agent output. Never model reasoning."
+    )
     data: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=_now)
 
@@ -196,6 +284,7 @@ class Mission(BaseModel):
     approvals: list[ApprovalRequest] = Field(default_factory=list)
     final_result: str | None = None
     error: str | None = None
+    metrics: MissionMetrics | None = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 
