@@ -1,0 +1,21 @@
+# Render Blueprint for the Hion backend. In the Render dashboard: New ->
+# Blueprint -> pick this repo. Render reads this file and provisions the
+# service below; you'll be prompted for the envVars marked sync: false.
+#
+# The web/ frontend (deployed separately on Vercel) needs its
+# NEXT_PUBLIC_HION_API_URL set to this service's URL once it's live.
+services:
+  - type: web
+    name: hion-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: HION_MODEL_PROVIDER
+        value: anthropic
+      - key: HION_MODEL_API_KEY
+        sync: false
+      - key: HION_WORKSPACE_DIR
+        value: /app/workspace
